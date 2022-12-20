@@ -1,0 +1,344 @@
+---
+title: "MA-muni-census-data"
+author: "Joe Delorto"
+format: html
+---
+
+```{r packages}
+library(tidyverse)
+library(tidycensus)
+```
+
+The goal of this project is to produce a table that displays, for each municipality in MA, the following statistics:
+
+* average household size
+* average family size
+* % population by age group (<18, 18-24, 25-44, 45-64, 65+) (C18018_002)
+* median income (for households, B19001, and families, B19101)
+* male vs. female median income
+
+```{r loadvars}
+vars_2020 <- load_variables(year = 2020, dataset = "pl")
+vars_acs <- load_variables(year = 2021, dataset = "acs5")
+```
+
+It will be helpful for both the readability of this code and future analyses to define some functions, so let's do that.
+
+```{r functions}
+get_population <- function(census_geography, year, state) {
+  if (year == 2020)
+    var <- "P1_001N"
+  else
+    var <- "P001001"
+  
+  dec <- get_decennial(geography = census_geography, variables = var, year = year, state = state)
+  return(dec)
+}
+
+get_population_by_race <- function(census_geography, year, state) {
+  if (year == 2020){
+    dec_vars <- paste0("P1_", str_pad(string = 3:9, width = 3, side = "left", pad = "0"), "N")
+    sum_var <- "P1_001N"
+  }
+  else{
+    dec_vars <- paste0("P008", str_pad(string = 3:9, width = 3, side = "left", pad = "0"))
+    sum_var <- "P001001"
+  }
+  
+  dec <- get_decennial(geography = census_geography, 
+                       variables = dec_vars, 
+                       year = year, 
+                       state = state,
+                       summary_var = sum_var)
+  return(dec)
+}
+
+get_households_acs <- function(census_geography, year, state) {
+  acs_var_subscripts <- c(1,2,3,6,7,8)
+  acs_vars <- c(paste0("B11001_", str_pad(string = acs_var_subscripts, width = 3, side = "left", pad = "0")), 
+                "B11005_002",
+                "B11007_003")
+  acs <- get_acs(geography = census_geography, variables = acs_vars, year = year, state = state)
+  return(acs)
+}
+
+get_housing_units <- function(census_geography, year, state) {
+  if (year == 2020)
+    var <- "H1_001N"
+  else
+    var <- "H001001"
+  
+  dec <- get_decennial(geography = census_geography, variables = var, year = year, state = state)
+  return(dec)
+}
+
+get_hispanic_latino_population_acs <- function(census_geography, year, state){
+  get_acs(geography = census_geography, 
+          variables = "B03001_003", 
+          year = year, 
+          state = state, 
+          summary_var = "B01001_001")
+}
+
+get_hispanic_latino_origin_acs <- function(census_geography, year, state){
+  acs_var_subscripts <- str_pad(string = c(4:7, 9:15, 17:26, 28:31), width = 3, side = "left", pad = 0)
+  acs_vars <- paste0("B03001_", acs_var_subscripts)
+  get_acs(geography = census_geography, 
+          variables = acs_vars, 
+          year = year, 
+          state = state,
+          summary_var = "B01001_001")
+}
+
+get_population_by_sex_acs <- function(census_geography, year, state){
+  acs_vars <- paste0("B01001_",str_pad(string = c(1,2,26), width = 3, side = "left", pad = "0"))
+  get_acs(geography = census_geography, variables = acs_vars, year = year, state = state)
+}
+
+get_male_adult_population_by_age_acs <- function(census_geography, year, state){
+  acs_vars <- paste0("B01001_", str_pad(string = 7:25, width = 3, side = "left", pad = "0"))
+  get_acs(geography = census_geography, variables = acs_vars, year = year, state = state)
+}
+
+get_female_adult_population_by_age_acs <- function(census_geography, year, state){
+  acs_vars <- paste0("B01001_", str_pad(string = 31:49, width = 3, side = "left", pad = "0"))
+  get_acs(geography = census_geography, variables = acs_vars, year = year, state = state)
+}
+
+get_median_age_acs <- function(census_geography, year, state){
+  get_acs(geography = census_geography, variables = "B01002_001", year = year, state = state)
+}
+
+get_pop_below_poverty_line_acs <- function(census_geography, year, state){
+  get_acs(geography = census_geography, 
+          variables = "B17020_002", 
+          year = year, 
+          state = state, 
+          summary_var = "B01001_001")
+}
+
+get_median_income_acs <- function(census_geography, year, state){
+  get_acs(geography = census_geography,
+          variables = "B06011_001",
+          year = year,
+          state = state)
+}
+
+get_family_poverty_status_acs <- function(census_geography, year, state, poverty_pct){
+  if(poverty_pct == 100)
+    max <- 4
+  else if(poverty_pct == 150)
+    max <- 5
+  else
+    stop("enter 100 or 150 % of poverty level")
+  acs_vars  <- paste0("B17026_", str_pad(string = 2:max, width = 3, side = "left", pad = "0"))
+  get_acs(geography = census_geography,
+          variables = acs_vars,
+          year = year,
+          state = state,
+          summary_var = "B17026_001")
+}
+```
+
+```{r}
+geography <- tigris::county_subdivisions(state = "MA") %>%
+  select(GEOID, NAME, ALAND) %>% 
+  mutate(area = ALAND / 2589988) %>% ## convert sq meters to sq mi
+  select(!ALAND)
+
+dec_population <- get_population(census_geography = "county subdivision", 
+                                 year = 2020, 
+                                 state = "MA")
+dec_pop_by_race <- get_population_by_race(census_geography = "county subdivision", 
+                                          year = 2020, 
+                                          state = "MA")
+acs_pop_by_sex <- get_population_by_sex_acs(census_geography = "county subdivision", 
+                                            year = 2021, 
+                                            state = "MA")
+acs_m_adult_pop_by_age <- get_male_adult_population_by_age_acs(census_geography = "county subdivision", 
+                                                   year = 2021, 
+                                                   state = "MA")
+acs_f_adult_pop_by_age <- get_female_adult_population_by_age_acs(census_geography = "county subdivision", 
+                                                     year = 2021, 
+                                                     state = "MA")
+acs_hispanic_latino <- get_hispanic_latino_population_acs(census_geography = "county subdivision", 
+                                                          year = 2021, 
+                                                          state = "MA")
+acs_hispanic_latino_origin <- get_hispanic_latino_origin_acs(census_geography = "county subdivision", 
+                                                             year = 2021, 
+                                                             state = "MA")
+acs_households <- get_households_acs(census_geography = "county subdivision", 
+                                     year = 2021, 
+                                     state = "MA")
+dec_housing_units <- get_housing_units(census_geography = "county subdivision", 
+                                       year = 2020, 
+                                       state = "MA")
+acs_median_age <- get_median_age_acs(census_geography = "county subdivision", 
+                                     year = 2021, 
+                                     state = "MA")
+acs_pop_below_poverty_line <- get_pop_below_poverty_line_acs(census_geography = "county subdivision",
+                                                             year = 2021,
+                                                             state = "MA")
+acs_median_income <- get_median_income_acs(census_geography = "county subdivision", year = 2021, state = "MA")
+acs_families_below_100pct_poverty <- get_family_poverty_status_acs(census_geography = "county subdivision",
+                                                                   year = 2021,
+                                                                   state = "MA",
+                                                                   poverty_pct = 100)
+acs_families_below_150pct_poverty <- get_family_poverty_status_acs(census_geography = "county subdivision",
+                                                                   year = 2021,
+                                                                   state = "MA",
+                                                                   poverty_pct = 150)
+```
+
+```{r}
+## create table for total population and population density
+
+population <- dec_population %>% 
+  select(GEOID, NAME, value) %>%
+  left_join(geography, by = "GEOID") %>% 
+  mutate(pop_density = value / area)
+
+## create table for population by sex
+
+vars_pop_by_sex <- c("total","male","female")
+
+pop_by_sex <- acs_pop_by_sex %>%
+  mutate(var_name = rep(vars_pop_by_sex, length.out = nrow(acs_pop_by_sex))) %>% 
+  select(!variable) %>% 
+  pivot_wider(names_from = var_name, values_from = c(estimate, moe)) %>% 
+  mutate(estimate_mper100f = 100 * estimate_male / estimate_female,
+         moe_mper100f = 100 * moe_prop(estimate_male, estimate_female, moe_male, moe_female))
+  ## need to pivot this longer now...
+
+m_adult_pop <- acs_m_adult_pop_by_age %>% 
+  group_by(GEOID) %>% 
+  summarise(estimate = sum(estimate), moe = moe_sum(moe = moe, estimate = estimate)) %>% 
+  rename(estimate_madult = estimate, moe_madult = moe)
+
+f_adult_pop <- acs_f_adult_pop_by_age %>% 
+  group_by(GEOID) %>% 
+  summarise(estimate = sum(estimate), moe = moe_sum(moe = moe, estimate = estimate)) %>% 
+  rename(estimate_fadult = estimate, moe_fadult = moe)
+
+adult_pop <- m_adult_pop %>% 
+  left_join(f_adult_pop) %>% 
+  mutate(estimate_mper100fadult = estimate_madult / estimate_fadult,
+         moe_mper100fadult = moe_prop(estimate_madult, estimate_fadult, moe_madult, moe_fadult))
+
+pop_by_sex <- pop_by_sex %>% 
+  full_join(adult_pop, by = "GEOID")
+
+## create table for housing units and housing unit density
+
+housing_units <- dec_housing_units %>% 
+  select(GEOID, NAME, value) %>% 
+  left_join(geography, by = "GEOID") %>% 
+  mutate(unit_density = value / area)
+
+## create table for households
+
+## go through a lot of work to create a list of descriptive variable names in a somewhat reproducible way
+vars_households <- vars_acs %>% 
+  filter(name %in% unique(acs_households$variable)) %>%
+  separate(label, into = c("A", "B", "description1", "description2", "description3"), sep = "!!") %>% 
+  mutate(var_name = rep("", length(unique(acs_households$variable))))
+
+for(i in 2:(nrow(vars_households)-1)){
+  if(!is.na(vars_households[i,6]))
+    vars_households[i,9] <- vars_households[i,6]
+  else if(!is.na(vars_households[i,5]))
+    vars_households[i,9] <- vars_households[i,5]
+  else
+    vars_households[i,9] <- vars_households[i,4]
+}
+vars_households[1,9] <- "Total households"
+vars_households[8,9] <- "Person age 65+ living alone"
+
+vars_households <- vars_households %>% select(name, var_name)
+
+households <- acs_households %>% 
+  left_join(vars_households, by = c("variable" = "name")) %>% 
+  relocate(var_name, .after = variable)
+
+## create table for percent population by race
+
+vars_pop_by_race <- vars_2020 %>% 
+  filter(name %in% unique(dec_pop_by_race$variable)) %>%
+  separate(label, into = c("A", "B", "description1","description2"), sep = "!!") %>%
+  mutate(var_name = description2) %>% 
+  select(name, var_name)
+vars_pop_by_race[7,2] <- "Two or more races"
+
+pop_by_race <- dec_pop_by_race %>% 
+  left_join(vars_pop_by_race, by = c("variable" = "name")) %>% 
+  mutate(pct = value / summary_value)
+
+##colnames(pop_by_race) <- c.factor("GEOID", "NAME", "total_pop", vars_pop_by_race[1:6,5], vars_pop_by_race[7,4])
+
+## create table for Hispanic/Latino population
+
+## start by creating a list of which variables will be used for this table
+vars_hispanic_latino <- vars_acs %>% 
+  filter(name %in% unique(c(acs_hispanic_latino_origin$variable, acs_hispanic_latino_origin$variable))) %>% 
+  separate(label, into = c("A", "B", "description1", "description2","description3"), sep = "!!") %>% 
+  select(name, description2, description3) %>%
+  mutate(var_name = rep("", length(unique(acs_hispanic_latino_origin$variable))))
+
+## create a single column with the most specific variable description possible
+for(i in 1:nrow(vars_hispanic_latino)){
+  if(!is.na(vars_hispanic_latino[i,3]))
+    vars_hispanic_latino[i,4] <- vars_hispanic_latino[i,3]
+  else
+    vars_hispanic_latino[i,4] <- vars_hispanic_latino[i,2]
+}
+
+## keep only the variable code and name
+vars_hispanic_latino <- vars_hispanic_latino %>%
+  select(name, var_name)
+
+hispanic_latino <- acs_hispanic_latino %>% 
+  mutate(pct = estimate / summary_est, moe_pct = moe_prop(estimate, summary_est, moe, summary_moe))
+
+hispanic_latino_origin <- acs_hispanic_latino_origin %>% 
+  mutate(pct = estimate / summary_est, moe_pct = moe_prop(estimate, summary_est, moe, summary_moe)) %>%
+  filter(estimate != 0) %>% ## remove any groups that have zero population in a given municipality
+  group_by(GEOID) %>% 
+  slice_max(estimate, n = 5) %>% ## report the top 5 Hispanic/Latino ethnicities by population for each municipality
+  left_join(vars_hispanic_latino, by = c("variable" = "name")) %>% ## assign descriptive names to variable codes
+  relocate(var_name, .after = variable)
+
+## create table for population below poverty line
+
+pop_below_poverty_line <- acs_pop_below_poverty_line %>% 
+  mutate(pct = estimate / summary_est,
+         pct_moe = moe_prop(estimate, summary_est, moe, summary_moe))
+
+## create table for median income per capita
+
+median_income <- acs_median_income
+
+## create table for percent families below poverty line
+
+## 100 percent of poverty line
+families_below_100pct_poverty <- acs_families_below_100pct_poverty %>% 
+  group_by(GEOID, NAME) %>% 
+  summarise(estimate_100pct = sum(estimate),
+            moe_100pct = moe_sum(moe = moe, estimate = estimate))
+
+## 150 percent of poverty line
+families_below_150pct_poverty <- acs_families_below_150pct_poverty %>% 
+  group_by(GEOID) %>% 
+  summarise(estimate_150pct = sum(estimate),
+            moe_150pct = moe_sum(moe = moe, estimate = estimate),
+            summary_est = mean(summary_est),
+            summary_moe = mean(summary_moe))
+
+family_poverty_status <- 
+  full_join(families_below_100pct_poverty,
+            families_below_150pct_poverty,
+            by = "GEOID") %>% 
+  summarise(est_prop_below_100pct = estimate_100pct / summary_est,
+            moe_prop_below_100pct = moe_prop(estimate_100pct, summary_est, moe_100pct, summary_moe),
+            est_prop_below_150pct = estimate_150pct / summary_est,
+            moe_prop_below_150pct = moe_prop(estimate_150pct, summary_est, moe_150pct, summary_moe))
+```
