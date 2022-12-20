@@ -9,7 +9,7 @@ library(tidyverse)
 library(tidycensus)
 ```
 
-The goal of this project is to produce a table that displays, for each municipality in MA, the following statistics:
+These are the statistics I still need to define:
 
 * average household size
 * average family size
