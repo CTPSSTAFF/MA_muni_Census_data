@@ -1,0 +1,45 @@
+---
+title: "MA_muni_Census_data_SUBJ_PROF"
+author: "Joe Delorto"
+format: html
+---
+
+This document produces (and details the process of producing) a municipal-level summary Census data table for every municipality in the Commonwealth of Massachusetts.
+
+To complete this analysis, we will use the `tidycensus` library to access the US Census Data API and the `tidyverse` family of products to analyze the data.
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+```
+
+Let's first access a list of applicable variables from various US Census and American Community Survey (ACS) data tables. Most of the information we need is contained in the ACS "subject" and "data profile" tables. We will use data from the 2020 decennial Census and 2021 5-year ACS estimates.
+
+```{r}
+vars_decn <- tidycensus::load_variables(year = 2020, dataset = "pl") 
+## "pl" is the only dataset available for the 2020 Census at the moment (late December 2022)
+vars_acs5 <- tidycensus::load_variables(year = 2021, dataset = "acs5")
+vars_subj <- tidycensus::load_variables(year = 2021, dataset = "acs5/subject")
+vars_prof <- tidycensus::load_variables(year = 2021, dataset = "acs5/profile")
+```
+
+Per a data request, we need to produce a table with the following values (Census variables listed in parentheses):
+
+* population (S0101_C01_001)
+* population density (will require manual normalization by land area)
+* % population by race (beginning at DP05_0037P)
+* % population by Hispanic/Latino ethnicity (DP05_0071P)
+* % population by age group (S0101_C01)
+* ratio of males per 100 females (DP05_0004) and adult males per 100 adult females (DP05_0028)
+* number of households 
+* average household size (DP02_0016)
+* % households w/ children under 18
+* % of households w/ married couples living together
+* % of households only someone living alone
+* % of households only someone age 65+ living alone
+* number of families
+* average family size (DP02_0017)
+* number of housing units
+* housing unit density
+* median income (for households, S1901_C01_012, and families, S1901_C02_012)
+* % of families living below the poverty line

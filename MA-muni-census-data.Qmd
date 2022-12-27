@@ -11,15 +11,17 @@ library(tidycensus)
 
 These are the statistics I still need to define:
 
-* average household size
-* average family size
-* % population by age group (<18, 18-24, 25-44, 45-64, 65+) (C18018_002)
-* median income (for households, B19001, and families, B19101)
+* average household size (DP02_0016)
+* average family size (DP02_0017)
+* % population by age group (<18, 18-24, 25-44, 45-64, 65+) (S0101_C01, don't worry about the intervals)
+* median income (for households, S1901_C01_012, and families, S1901_C02_012)
 * male vs. female median income
 
 ```{r loadvars}
-vars_2020 <- load_variables(year = 2020, dataset = "pl")
-vars_acs <- load_variables(year = 2021, dataset = "acs5")
+vars_2020 <- tidycensus::load_variables(year = 2020, dataset = "pl")
+vars_acs <- tidycensus::load_variables(year = 2021, dataset = "acs5")
+vars_subj <- tidycensus::load_variables(year = 2021, dataset = "acs5/subject")
+vars_prof <- tidycensus::load_variables(year = 2021, dataset = "acs5/profile")
 ```
 
 It will be helpful for both the readability of this code and future analyses to define some functions, so let's do that.
@@ -31,8 +33,7 @@ get_population <- function(census_geography, year, state) {
   else
     var <- "P001001"
   
-  dec <- get_decennial(geography = census_geography, variables = var, year = year, state = state)
-  return(dec)
+  get_decennial(geography = census_geography, variables = var, year = year, state = state)
 }
 
 get_population_by_race <- function(census_geography, year, state) {
@@ -45,12 +46,11 @@ get_population_by_race <- function(census_geography, year, state) {
     sum_var <- "P001001"
   }
   
-  dec <- get_decennial(geography = census_geography, 
+  get_decennial(geography = census_geography, 
                        variables = dec_vars, 
                        year = year, 
                        state = state,
                        summary_var = sum_var)
-  return(dec)
 }
 
 get_households_acs <- function(census_geography, year, state) {
@@ -58,8 +58,15 @@ get_households_acs <- function(census_geography, year, state) {
   acs_vars <- c(paste0("B11001_", str_pad(string = acs_var_subscripts, width = 3, side = "left", pad = "0")), 
                 "B11005_002",
                 "B11007_003")
-  acs <- get_acs(geography = census_geography, variables = acs_vars, year = year, state = state)
-  return(acs)
+  get_acs(geography = census_geography, 
+          variables = acs_vars, 
+          year = year, 
+          state = state,
+          summary_var = "B01001_001")
+}
+
+get_total_households_acs <- function(census_geography, year, state){
+  
 }
 
 get_housing_units <- function(census_geography, year, state) {
@@ -68,8 +75,7 @@ get_housing_units <- function(census_geography, year, state) {
   else
     var <- "H001001"
   
-  dec <- get_decennial(geography = census_geography, variables = var, year = year, state = state)
-  return(dec)
+  get_decennial(geography = census_geography, variables = var, year = year, state = state)
 }
 
 get_hispanic_latino_population_acs <- function(census_geography, year, state){
@@ -130,7 +136,7 @@ get_family_poverty_status_acs <- function(census_geography, year, state, poverty
   else if(poverty_pct == 150)
     max <- 5
   else
-    stop("enter 100 or 150 % of poverty level")
+    stop("poverty_pct must = 100 or 150 (% of poverty level)")
   acs_vars  <- paste0("B17026_", str_pad(string = 2:max, width = 3, side = "left", pad = "0"))
   get_acs(geography = census_geography,
           variables = acs_vars,
@@ -139,6 +145,8 @@ get_family_poverty_status_acs <- function(census_geography, year, state, poverty
           summary_var = "B17026_001")
 }
 ```
+
+We will now use the functions defined above to get the relevant statistics for Massachusetts municipalities, defined by the Census as "county subdivisions."
 
 ```{r}
 geography <- tigris::county_subdivisions(state = "MA") %>%
