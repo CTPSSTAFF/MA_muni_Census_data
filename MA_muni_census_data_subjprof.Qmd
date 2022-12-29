@@ -11,6 +11,7 @@ To complete this analysis, we will use the `tidycensus` library to access the US
 ```{r}
 library(tidyverse)
 library(tidycensus)
+library(sf)
 ```
 
 Let's first access a list of applicable variables from various US Census and American Community Survey (ACS) data tables. Most of the information we need is contained in the ACS "subject" and "data profile" tables. We will use data from the 2020 decennial Census and 2021 5-year ACS estimates.
@@ -23,23 +24,114 @@ vars_subj <- tidycensus::load_variables(year = 2021, dataset = "acs5/subject")
 vars_prof <- tidycensus::load_variables(year = 2021, dataset = "acs5/profile")
 ```
 
-Per a data request, we need to produce a table with the following values (Census variables listed in parentheses):
+Per a data request, we need to produce a table with the following values (Census variable codes listed in parentheses):
 
-* population (S0101_C01_001)
-* population density (will require manual normalization by land area)
+* population (P1_001N)
+* population density (manually normalized by land area)
 * % population by race (beginning at DP05_0037P)
 * % population by Hispanic/Latino ethnicity (DP05_0071P)
-* % population by age group (S0101_C01)
+* % population by age group (DP05_0005P)
 * ratio of males per 100 females (DP05_0004) and adult males per 100 adult females (DP05_0028)
-* number of households 
+* number of households (DP02_0001)
 * average household size (DP02_0016)
-* % households w/ children under 18
-* % of households w/ married couples living together
-* % of households only someone living alone
-* % of households only someone age 65+ living alone
-* number of families
+* % of households w/ children under 18 (DP02_0014P)
+* % of households w/ married couples living together (DP02_0002P)
+* % of households w/ female householder, no spouse/partner present (DP02_0010P)
+* % of households that are not families (S1101_C05_009 / S1101_C01_001)
+* % of households only someone living alone (S1101_C01_013 / S1101_C01_001)
+* % of households only someone age 65+ living alone (S1101_C01_014 / S1101_C01_001)
+* number of families ??
 * average family size (DP02_0017)
-* number of housing units
-* housing unit density
+* number of housing units (DP04_0001)
+* housing unit density (manually normalized by land area)
 * median income (for households, S1901_C01_012, and families, S1901_C02_012)
-* % of families living below the poverty line
+* % of families living below the poverty line (DP03_0119P)
+
+Let's turn that list of variables into a list (or, more specifically, a vector) that R and tidycensus can read:
+
+```{r}
+var_list <- c(paste0("DP05_",         ## population by race, Hispanic/Latino ethnicity, and age group
+                    str_pad(string = c(37:41, 44, 52, 57, 71, 5), 
+                         width = 4, 
+                         side = "left", 
+                         pad = "0"), 
+                   "P"),              
+           "DP05_0004", "DP05_0028",  ## ratio of males per 100 females (total and adult)
+           "DP02_0001", "DP02_0016",  ## number of households and average household size
+            paste0("DP02_",           ## % of hh's w/ children under 18, married couples, and female hh'er no partner
+                  str_pad(string = c(14, 2, 10),
+                          width = 4,
+                          side = "left",
+                          pad = "0"),
+                  "P"),
+            "S1101_C05_009",          ## number of non-family households
+            paste0("S1101_C01_",      ## total households, living alone, 65+ living alone
+                   str_pad(string = c(1, 13, 14),
+                           width = 3,
+                           side = "left",
+                           pad = "0")),
+            "B11001_002",             ## family households
+            "DP02_0017",              ## average family size
+            "DP04_0001",              ## number of housing units
+            "S1901_C01_012",          ## median household income 
+            "S1901_C02_012",          ## median family income
+            "DP03_0119P"              ## % of families living below poverty line
+          )
+```
+
+Now, we can call the tidycensus API to get those values from the Census. We call population separately since we want that value to come from the 2020 Census, but all other values to be based on the most recent 5-year ACS estimates (from 2021). In Census-speak, Massachusetts municipalities are stored as "county subdivisions."
+
+```{r}
+population <- tidycensus::get_decennial(geography = "county subdivision",
+                                        variables = "P1_001N",
+                                        year = 2020,
+                                        state = "MA")
+
+acs_stats <- tidycensus::get_acs(geography = "county subdivision",
+                                 variables = var_list,
+                                 year = 2021,
+                                 state = "MA")
+
+## combine all statistics into one data frame and get rid of the "undefined" geographies
+population <- population %>% 
+  select(!variable)
+
+muni_stats <- acs_stats %>% 
+  pivot_wider(names_from = "variable", values_from = c("estimate", "moe")) %>% 
+  full_join(population) %>% 
+  mutate(GEOID = as.numeric(GEOID)) %>% 
+  filter(GEOID %% 10000 != 0) %>% 
+  relocate(value, .after = NAME)
+```
+
+Now we need to calculate a few statistics that we were not able to pull directly from the Census bureau.
+
+```{r}
+## grab Census geographies to allow for normalization by area
+
+geography <- tigris::county_subdivisions(state = "MA") %>% 
+  st_drop_geometry() %>% 
+  select(GEOID, NAME, ALAND) %>% 
+  rename(town_name = NAME) %>% 
+  mutate(GEOID = as.numeric(GEOID))
+
+muni_stats <- muni_stats %>% 
+  left_join(geography)
+
+## reorder columns
+column_names <- c("GEOID", "town_name", "value",
+                  paste0(c("estimate_", "moe_"), rep(var_list, each = 2)),
+                  "ALAND")
+
+muni_stats <- muni_stats %>% 
+  select(column_names)
+
+## calculate population and housing unit density
+muni_stats <- muni_stats %>% 
+  mutate(ALAND = ALAND / 2589988, ## convert from sq meters to sq miles
+         pop_dens = round(value / ALAND, 2),
+         unit_dens = round(estimate_DP04_0001 / ALAND, 2)) %>% 
+  relocate(pop_dens, .after = value) %>% 
+  relocate(unit_dens, .after = moe_DP04_0001)
+```
+
