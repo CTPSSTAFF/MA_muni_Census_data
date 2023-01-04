@@ -1,7 +1,8 @@
 ---
-title: "MA_muni_Census_data_SUBJ_PROF"
+title: "Massachusetts Municipal Census Data Table"
 author: "Joe Delorto"
 format: html
+self-contained: true
 ---
 
 This document produces (and details the process of producing) a municipal-level summary Census data table for every municipality in the Commonwealth of Massachusetts.
@@ -112,19 +113,19 @@ Now we need to calculate a few statistics that we were not able to pull directly
 geography <- tigris::county_subdivisions(state = "MA") %>% 
   st_drop_geometry() %>% 
   select(GEOID, NAME, ALAND) %>% 
-  rename(town_name = NAME) %>% 
+  rename(muni_name = NAME) %>% 
   mutate(GEOID = as.numeric(GEOID))
 
 muni_stats <- muni_stats %>% 
   left_join(geography)
 
 ## reorder columns
-column_names <- c("GEOID", "town_name", "value",
+column_names <- c("GEOID", "muni_name", "value",
                   paste0(c("estimate_", "moe_"), rep(var_list, each = 2)),
                   "ALAND")
 
 muni_stats <- muni_stats %>% 
-  select(column_names)
+  select(all_of(column_names))
 
 ## calculate population and housing unit density
 muni_stats <- muni_stats %>% 
@@ -132,6 +133,7 @@ muni_stats <- muni_stats %>%
          pop_dens = round(value / ALAND, 2),
          unit_dens = round(estimate_DP04_0001 / ALAND, 2)) %>% 
   relocate(pop_dens, .after = value) %>% 
-  relocate(unit_dens, .after = moe_DP04_0001)
+  relocate(unit_dens, .after = moe_DP04_0001) %>% 
+  arrange(muni_name)
 ```
 
