@@ -113,6 +113,7 @@ Now we need to calculate a few statistics that we were not able to pull directly
 geography <- tigris::county_subdivisions(state = "MA") %>% 
   st_drop_geometry() %>% 
   select(GEOID, NAME, ALAND) %>% 
+  mutate(ALAND = ALAND / 2589988) %>%  ## convert from sq meters to sq miles
   rename(muni_name = NAME) %>% 
   mutate(GEOID = as.numeric(GEOID))
 
@@ -129,11 +130,16 @@ muni_stats <- muni_stats %>%
 
 ## calculate population and housing unit density
 muni_stats <- muni_stats %>% 
-  mutate(ALAND = ALAND / 2589988, ## convert from sq meters to sq miles
-         pop_dens = round(value / ALAND, 2),
+  mutate(pop_dens = round(value / ALAND, 2),
          unit_dens = round(estimate_DP04_0001 / ALAND, 2)) %>% 
   relocate(pop_dens, .after = value) %>% 
   relocate(unit_dens, .after = moe_DP04_0001) %>% 
   arrange(muni_name)
+```
+
+And now we write the output to a csv:
+
+```{r}
+muni_stats %>% write_csv(file = "output/muni_stats.csv")
 ```
 
