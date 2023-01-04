@@ -1,8 +1,11 @@
 ---
 title: "Massachusetts Municipal Census Data Table"
 author: "Joe Delorto"
-format: html
-self-contained: true
+format: 
+  html:
+    self-contained: true
+warning: false
+message: false
 ---
 
 This document produces (and details the process of producing) a municipal-level summary Census data table for every municipality in the Commonwealth of Massachusetts.
@@ -108,6 +111,8 @@ muni_stats <- acs_stats %>%
 Now we need to calculate a few statistics that we were not able to pull directly from the Census bureau.
 
 ```{r}
+#| results: "hide"
+
 ## grab Census geographies to allow for normalization by area
 
 geography <- tigris::county_subdivisions(state = "MA") %>% 
