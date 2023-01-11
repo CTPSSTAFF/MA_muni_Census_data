@@ -55,7 +55,7 @@ Let's turn that list of variables into a list (or, more specifically, a vector) 
 
 ```{r}
 var_list <- c(paste0("DP05_",         ## population by race, Hispanic/Latino ethnicity, and age group
-                    str_pad(string = c(37:41, 44, 52, 57, 71, 5), 
+                    str_pad(string = c(37:39, 44, 52, 57, 58, 71, 5), 
                          width = 4, 
                          side = "left", 
                          pad = "0"), 
@@ -133,13 +133,61 @@ column_names <- c("GEOID", "muni_name", "value",
 muni_stats <- muni_stats %>% 
   select(all_of(column_names))
 
-## calculate population and housing unit density
+## calculate population and housing unit density, percentage of household types
 muni_stats <- muni_stats %>% 
   mutate(pop_dens = round(value / ALAND, 2),
          unit_dens = round(estimate_DP04_0001 / ALAND, 2)) %>% 
   relocate(pop_dens, .after = value) %>% 
   relocate(unit_dens, .after = moe_DP04_0001) %>% 
-  arrange(muni_name)
+  arrange(muni_name) ## below, we calculate percentage values
+#  mutate(estimate_S1101_C01_013P = round(estimate_S1101_C01_013 / estimate_S1101_C01_001 * 100, 2),
+#         moe_S1101_C01_013P = moe_prop(estimate_S1101_C01_013, estimate_S1101_C01_001,
+#                                       moe_S1101_C01_013, moe_S1101_C01_001) * 100,
+#         estimate_S1101_C01_014P = round(estimate_S1101_C01_014 / estimate_S1101_C01_001 * 100, 2),
+#         moe_S1101_C01_014P = moe_prop(estimate_S1101_C01_014, estimate_S1101_C01_001,
+#                                       moe_S1101_C01_014, moe_S1101_C01_001 * 100),
+#         estimate_S1101_C05_009P = round(estimate_S1101_C05_009 / estimate_S1101_C01_001 * 100, 2),
+#         moe_S1101_C05_009P = moe_prop(estimate_S1101_C05_009, estimate_S1101_C01_001,
+#                                       moe_S1101_C05_009, moe_S1101_C01_001) * 100) %>% 
+#  mutate(estimate_S1101_C01_013 = estimate_S1101_C01_013P, ## replace raw numbers with calculated percentages
+#         moe_S1101_C01_013 = moe_S1101_C01_013P,
+#         estimate_S1101_C01_014 = estimate_S1101_C01_014P,
+#         moe_S1101_C01_014 = moe_S1101_C01_014P,
+#         estimate_S1101_C05_009 = estimate_S1101_C05_009P,
+#         moe_S1101_C05_009 = moe_S1101_C05_009P) %>%
+#  select(-c(estimate_S1101_C01_013P, moe_S1101_C01_013P, ## drop intermediate variables
+#            estimate_S1101_C01_014P, moe_S1101_C01_014P,
+#            estimate_S1101_C05_009P, moe_S1101_C05_009P,
+#            estimate_S1101_C01_001, moe_S1101_C01_001))
+```
+
+Let's pull some more descriptive variable names:
+
+```{r}
+all_vars <- bind_rows(vars_acs5 %>% mutate(tab = "ACS5"),
+               vars_decn %>% mutate(tab = "DEC"), 
+               vars_prof %>% mutate(tab = "DP"), 
+               vars_subj %>% mutate(tab = "SUMM"))
+
+all_vars <- all_vars %>% filter(name %in% var_list) %>% 
+  separate(label, into = c("a", "b", "c", "d", "e"), extra = "merge", sep = "!!") %>% 
+  mutate(e = str_replace_all(e, "!!", ": "))
+```
+
+We need to pivot the data to a long format now to allow for better separation by individual municipality:
+
+```{r}
+muni_stats <- muni_stats %>% 
+  rename(population = value) %>% 
+  ungroup() %>%
+  pivot_longer(cols = c(-GEOID, -muni_name)) %>% 
+  mutate(type = if_else(str_detect(name, pattern = "moe_"), "moe", "value"),
+         name = str_remove(name, "estimate_"),
+         name = str_remove(name, "moe_")) %>% 
+  pivot_wider(id_cols = c(GEOID, muni_name, name),
+              names_from = type) %>% 
+  left_join(all_vars) %>% 
+  select(!c(geography, tab))
 ```
 
 And now we write the output to a csv:
@@ -147,4 +195,3 @@ And now we write the output to a csv:
 ```{r}
 muni_stats %>% write_csv(file = "output/muni_stats.csv")
 ```
-
