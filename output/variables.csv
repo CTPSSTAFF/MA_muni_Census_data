@@ -1,0 +1,31 @@
+name,measure,table_description,concept,tab,url
+B11001_002,Estimate,Total: Family Households,HOUSEHOLD TYPE (INCLUDING LIVING ALONE),ACS 5-year (ACS2017-2021),https://data.census.gov/table?q=B11001
+P1_001N,Value,Total Population,RACE,Decennial Census (2020),https://data.census.gov/table?q=P1
+DP02_0001,Estimate,Households By Type: Total Households,SELECTED SOCIAL CHARACTERISTICS IN THE UNITED STATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP02
+DP02_0002P,Percent,Households By Type: Total Households: Married-Couple Household,SELECTED SOCIAL CHARACTERISTICS IN THE UNITED STATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP02
+DP02_0010P,Percent,"Households By Type: Total Households: Female Householder, No Spouse/Partner Present",SELECTED SOCIAL CHARACTERISTICS IN THE UNITED STATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP02
+DP02_0014P,Percent,Households By Type: Total Households: Households With One Or More People Under 18 Years,SELECTED SOCIAL CHARACTERISTICS IN THE UNITED STATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP02
+DP02_0016,Estimate,Households By Type: Total Households: Average Household Size,SELECTED SOCIAL CHARACTERISTICS IN THE UNITED STATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP02
+DP02_0017,Estimate,Households By Type: Total Households: Average Family Size,SELECTED SOCIAL CHARACTERISTICS IN THE UNITED STATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP02
+DP03_0119P,Percent,Percentage Of Families And People Whose Income In The Past 12 Months Is Below The Poverty Level: All Families,SELECTED ECONOMIC CHARACTERISTICS,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP03
+DP04_0001,Estimate,Housing Occupancy: Total Housing Units,SELECTED HOUSING CHARACTERISTICS,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP04
+DP05_0004,Estimate,Sex And Age: Total Population: Sex Ratio (Males Per 100 Females),ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0005P,Percent,Sex And Age: Total Population: Under 5 Years,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0028,Estimate,Sex And Age: Total Population: 18 Years And Over: Sex Ratio (Males Per 100 Females),ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0037P,Percent,Race: Total Population: One Race: White,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0038P,Percent,Race: Total Population: One Race: Black Or African American,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0039P,Percent,Race: Total Population: One Race: American Indian And Alaska Native,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0044P,Percent,Race: Total Population: One Race: Asian,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0052P,Percent,Race: Total Population: One Race: Native Hawaiian And Other Pacific Islander,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0057P,Percent,Race: Total Population: One Race: Some Other Race,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0058P,Percent,Race: Total Population: Two Or More Races,ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+DP05_0071P,Percent,Hispanic Or Latino And Race: Total Population: Hispanic Or Latino (Of Any Race),ACS DEMOGRAPHIC AND HOUSING ESTIMATES,Demographic Profiles (ACS 2017-2021),https://data.census.gov/table?q=DP05
+S1101_C01_001,Estimate,Total: Households: Total Households,HOUSEHOLDS AND FAMILIES,Subject Tables (ACS 2017-2021),https://data.census.gov/table?q=S1101
+S1101_C01_013,Estimate,Total: Total Households: Selected Households By Type: Householder Living Alone,HOUSEHOLDS AND FAMILIES,Subject Tables (ACS 2017-2021),https://data.census.gov/table?q=S1101
+S1101_C01_014,Estimate,Total: Total Households: Selected Households By Type: Householder Living Alone: 65 Years And Over,HOUSEHOLDS AND FAMILIES,Subject Tables (ACS 2017-2021),https://data.census.gov/table?q=S1101
+S1101_C05_009,Estimate,Nonfamily Household: Total Households,HOUSEHOLDS AND FAMILIES,Subject Tables (ACS 2017-2021),https://data.census.gov/table?q=S1101
+S1901_C01_012,Estimate,Households: Median Income (Dollars),INCOME IN THE PAST 12 MONTHS (IN 2021 INFLATION-ADJUSTED DOLLARS),Subject Tables (ACS 2017-2021),https://data.census.gov/table?q=S1901
+S1901_C02_012,Estimate,Families: Median Income (Dollars),INCOME IN THE PAST 12 MONTHS (IN 2021 INFLATION-ADJUSTED DOLLARS),Subject Tables (ACS 2017-2021),https://data.census.gov/table?q=S1901
+ALAND,Value,Land Area (Square Miles),Reference Information,TIGER/Line Shapefiles,https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html
+pop_dens,Calculated Field,Population (P1_001N) Density (per Square Mile),Reference Information,Calculated Field,Calculated Field
+unit_dens,Calculated Field,Housing Unit (DP04_0001) Density (per Square Mile),Reference Information,Calculated Field,Calculated Field

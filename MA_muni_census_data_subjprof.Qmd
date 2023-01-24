@@ -100,6 +100,7 @@ acs_stats <- tidycensus::get_acs(geography = "county subdivision",
 population <- population %>% 
   select(!variable)
 
+# Filter out the geometries that are multiples of 10000. They appear to be 
 muni_stats <- acs_stats %>% 
   pivot_wider(names_from = "variable", values_from = c("estimate", "moe")) %>% 
   full_join(population) %>% 
@@ -115,7 +116,7 @@ Now we need to calculate a few statistics that we were not able to pull directly
 
 ## grab Census geographies to allow for normalization by area
 
-geography <- tigris::county_subdivisions(state = "MA") %>% 
+geography <- tigris::county_subdivisions(state = "MA", year = 2021) %>% 
   st_drop_geometry() %>% 
   select(GEOID, NAME, ALAND) %>% 
   mutate(ALAND = ALAND / 2589988) %>%  ## convert from sq meters to sq miles
@@ -164,21 +165,58 @@ muni_stats <- muni_stats %>%
 Let's pull some more descriptive variable names:
 
 ```{r}
-all_vars <- bind_rows(vars_acs5 %>% mutate(tab = "ACS5"),
-               vars_decn %>% mutate(tab = "DEC"), 
-               vars_prof %>% mutate(tab = "DP"), 
-               vars_subj %>% mutate(tab = "SUMM"))
+all_vars <- bind_rows(vars_acs5 %>% mutate(tab = "ACS 5-year (ACS2017-2021)"),
+               vars_decn %>% mutate(tab = "Decennial Census (2020)"), 
+               vars_prof %>% mutate(tab = "Demographic Profiles (ACS 2017-2021)"), 
+               vars_subj %>% mutate(tab = "Subject Tables (ACS 2017-2021)"))
 
-all_vars <- all_vars %>% filter(name %in% var_list) %>% 
-  separate(label, into = c("a", "b", "c", "d", "e"), extra = "merge", sep = "!!") %>% 
-  mutate(e = str_replace_all(e, "!!", ": "))
+all_vars <- all_vars %>% filter(name %in% var_list | name == "P1_001N") %>% 
+  separate(label, into = c("measure", "table_description"), extra = "merge", sep = "!!") %>% 
+  select(-geography) %>% 
+  # Change the !! to :, and the end of line : to empty string.
+  mutate(table_description = str_replace_all(table_description, "!!", ": "),
+         table_description = str_replace_all(table_description, "::", ": "),
+         table_description = str_replace_all(table_description, "  ", " "),
+         table_description = str_replace_all(table_description, ":$", "")) %>%
+  mutate(table_description = str_to_title(table_description))
+
+# Build website for reference
+all_vars <- all_vars %>% 
+  separate(name, into = c("tab_fam", "rest"), sep = "_", remove = FALSE) %>% 
+  mutate(url = paste0("https://data.census.gov/table?q=", tab_fam)) %>% 
+  select(-tab_fam, -rest)
+
+# adjust the total population values to be more clear and useful.
+all_vars <- all_vars %>% 
+  mutate(measure = case_when(name == "P1_001N" ~ "Value",
+                             TRUE ~ measure),
+         table_description = case_when(name == "P1_001N" ~ "Total Population",
+                             TRUE ~ table_description))
+
+# Build a table for our calculated fields.
+calc_fields <- tibble(
+  name = c("ALAND", "pop_dens", "unit_dens"),
+  measure = c("Value", 
+              "Calculated Field", 
+              "Calculated Field"),
+  table_description = c("Land Area (Square Miles)", 
+              "Population (P1_001N) Density (per Square Mile)", 
+              "Housing Unit (DP04_0001) Density (per Square Mile)"),
+  concept = c("Reference Information", "Reference Information", "Reference Information"),
+  tab = c("TIGER/Line Shapefiles", "Calculated Field", "Calculated Field"),
+  url = 
+    c("https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html",
+          "Calculated Field", "Calculated Field"))
+
+# put it all together
+all_vars <- bind_rows(all_vars, calc_fields)
 ```
 
 We need to pivot the data to a long format now to allow for better separation by individual municipality:
 
 ```{r}
 muni_stats <- muni_stats %>% 
-  rename(population = value) %>% 
+  rename("P1_001N" = value) %>% 
   ungroup() %>%
   pivot_longer(cols = c(-GEOID, -muni_name)) %>% 
   mutate(type = if_else(str_detect(name, pattern = "moe_"), "moe", "value"),
@@ -186,12 +224,12 @@ muni_stats <- muni_stats %>%
          name = str_remove(name, "moe_")) %>% 
   pivot_wider(id_cols = c(GEOID, muni_name, name),
               names_from = type) %>% 
-  left_join(all_vars) %>% 
-  select(!c(geography, tab))
+  left_join(all_vars %>% select(-tab, -url), by = "name")
 ```
 
 And now we write the output to a csv:
 
 ```{r}
 muni_stats %>% write_csv(file = "output/muni_stats.csv")
+all_vars %>% write_csv(file = "output/variables.csv")
 ```
